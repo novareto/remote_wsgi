@@ -23,7 +23,8 @@ setup(name='remote',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-          'wsgiproxy',
+        'barrel',
+        'wsgiproxy',
       ],
       tests_require=tests_require,
       extras_require={

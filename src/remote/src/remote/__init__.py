@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from wsgiproxy.app import WSGIProxyApp
+from barrel import cooper
+
+
+REALM = "grok"
+USERS = [('admin', 'admin')]
+
+auth = cooper.basicauth(users=USERS, realm=REALM)
 
 
 def lister(value):
@@ -34,4 +41,4 @@ def make_proxy(*global_conf, **local_conf):
         json_keys=json_keys,
         pickle_keys=pickle_keys,
     )
-    return logger(application)
+    return logger(auth(application))
