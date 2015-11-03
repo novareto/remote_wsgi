@@ -2,3 +2,10 @@
 use = egg:remote#proxy
 href = http://karl.novareto.de:8088
 string_keys = REMOTE_USER
+
+
+[server:main]
+use = egg:Paste#http
+host = 0.0.0.0
+port = 8898
+
