@@ -1,4 +1,21 @@
-[app:main]
+[app:test]
 use = egg:remote#proxy
+title = Some title
 href = http://karl.novareto.de:8088
 string_keys = REMOTE_USER
+
+
+[filter:assets]
+use = egg:fanstatic#fanstatic
+recompute_hashes = false
+versioning = true
+bottom = true
+minified = true
+compile = true
+publisher_signature = remotewsgi
+
+
+[composite:main]
+use = egg:remote#remotehub
+filter-with = assets
+/test = test

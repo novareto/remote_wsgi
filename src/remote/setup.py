@@ -23,14 +23,22 @@ setup(name='remote',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-        'barrel',
-        'wsgiproxy',
+          'barrel',
+          'wsgiproxy',
+          'fanstatic',
+          'js.jquery',
       ],
       tests_require=tests_require,
       extras_require={
             'test': tests_require
         },
       entry_points={
+          'paste.composite_factory': [
+              'remotehub = remote:hub_factory',
+          ],
+          'fanstatic.libraries': [
+              'remote_wsgi = remote.resources:library',
+              ],
          'paste.app_factory': [
              'proxy = remote:make_proxy',
          ],
