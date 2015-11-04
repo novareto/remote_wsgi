@@ -1,8 +1,0 @@
-xhttp.onreadystatechange = function() {
-    if (xhttp.readyState == 4 && xhttp.status == 200) {
-	obj = JSON.parse(xhttp.responseText);
-
-  }
-}
-xhttp.open("GET", "http://karl.novareto.de:8080/__about__", true);
-xhttp.send();
