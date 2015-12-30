@@ -5,6 +5,20 @@ href = http://karl.novareto.de:8088
 string_keys = REMOTE_USER
 
 
+[app:novareto]
+use = egg:remote#proxy
+title = Homepage 
+href = http://www.novareto.de
+string_keys = REMOTE_USER
+
+
+[app:extranet]
+use = egg:remote#proxy
+title = Extranet 
+href = http://localhost:8080/app
+string_keys = REMOTE_USER
+
+
 [filter:assets]
 use = egg:fanstatic#fanstatic
 recompute_hashes = false
@@ -18,6 +32,8 @@ publisher_signature = remotewsgi
 [composite:main]
 use = egg:remote#remotehub
 filter-with = assets
+/ = novareto
+/extranet = extranet
 /test = test
 
 

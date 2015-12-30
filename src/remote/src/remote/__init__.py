@@ -87,6 +87,6 @@ def make_proxy(*global_conf, **local_conf):
         json_keys=json_keys,
         pickle_keys=pickle_keys,
     )
-    app = auth(wrapper(application))
+    app = wrapper(application)
     app.title = local_conf.get('title') or 'No title'
     return app
