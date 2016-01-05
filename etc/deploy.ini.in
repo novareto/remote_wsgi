@@ -6,6 +6,20 @@ string_keys = REMOTE_USER
 login_method = xmlrpc
 
 
+[app:novareto]
+use = egg:remote#proxy
+title = Homepage 
+href = http://www.novareto.de
+string_keys = REMOTE_USER
+
+
+[app:extranet]
+use = egg:remote#proxy
+title = Extranet 
+href = http://localhost:8080/app
+string_keys = REMOTE_USER
+
+
 [filter:assets]
 use = egg:fanstatic#fanstatic
 recompute_hashes = false
@@ -25,6 +39,9 @@ log_level = debug
 
 [composite:hub]
 use = egg:remote#remotehub
+filter-with = assets
+/ = novareto
+/extranet = extranet
 /test = test
 
 
