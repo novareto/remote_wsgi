@@ -2,14 +2,9 @@
 
 import json
 from wsgiproxy.app import WSGIProxyApp
-from barrel import cooper
 from paste.urlmap import URLMap, parse_path_expression
 from .resources import js, css
-
-REALM = "grok"
-USERS = [('admin', 'admin')]
-
-auth = cooper.basicauth(users=USERS, realm=REALM)
+from .login import login_app, login_center
 
 
 def lister(value):
@@ -62,13 +57,15 @@ class RemoteHub(URLMap):
 
     def about(self, environ):
         for (domain, app_url), app in self.applications:
-            if app_url != '/__about__':
+            if app_url not in ('/__about__', 'login'):
                 yield (environ['HTTP_HOST'] + app_url,
                        getattr(app, 'title', app_url))
 
     def __init__(self, *args, **kwargs):
         URLMap.__init__(self, *args, **kwargs)
         self['/__about__'] = HubDetails(self)
+        self['/login'] = login_app
+        self['/dologin'] = login_center(self)
 
 
 def make_proxy(*global_conf, **local_conf):
@@ -78,7 +75,8 @@ def make_proxy(*global_conf, **local_conf):
     unicode_keys = lister(local_conf.get('unicode_keys'))
     json_keys = lister(local_conf.get('json_keys'))
     pickle_keys = lister(local_conf.get('pickle_keys'))
-
+    login_method = local_conf.get('login_method')
+    
     application = WSGIProxyApp(
         href,
         secret_file=secret_file,
@@ -87,6 +85,7 @@ def make_proxy(*global_conf, **local_conf):
         json_keys=json_keys,
         pickle_keys=pickle_keys,
     )
-    app = auth(wrapper(application))
+    app = wrapper(application)
+    app.login_method = login_method
     app.title = local_conf.get('title') or 'No title'
     return app

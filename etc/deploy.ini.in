@@ -3,6 +3,7 @@ use = egg:remote#proxy
 title = Some title
 href = http://karl.novareto.de:8088
 string_keys = REMOTE_USER
+login_method = xmlrpc
 
 
 [filter:assets]
@@ -15,10 +16,20 @@ compile = true
 publisher_signature = remotewsgi
 
 
-[composite:main]
+[filter:who]
+use = egg:repoze.who#config
+config_file = %(here)s/who.ini
+log_file = stdout
+log_level = debug
+
+
+[composite:hub]
 use = egg:remote#remotehub
-filter-with = assets
 /test = test
+
+
+[pipeline:main]
+pipeline = assets who hub
 
 
 [server:main]
