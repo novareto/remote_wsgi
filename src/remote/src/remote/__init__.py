@@ -1,10 +1,34 @@
 # -*- coding: utf-8 -*-
 
 import json
+import base64
 from wsgiproxy.app import WSGIProxyApp
 from paste.urlmap import URLMap, parse_path_expression
+from repoze.who.api import get_api
 from .resources import js, css
-from .login import login_app, login_center
+from .login import logout_app, login_center
+from .ticket import read_bauth
+
+
+FILTER_HEADERS = [
+    'Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailers',
+    'Transfer-Encoding',
+    'Upgrade',
+    ]
+
+
+def wrap_start_response(start_response):
+    def wrapped_start_response(status, headers_out):
+        # Remove "hop-by-hop" headers
+        headers_out = [(k,v) for (k,v) in headers_out
+                       if k not in FILTER_HEADERS]
+        return start_response(status, headers_out)
+    return wrapped_start_response
 
 
 def lister(value):
@@ -19,7 +43,18 @@ def wrapper(app):
     def caller(environ, start_response):
         js.need()
         css.need()
-        return app(environ, start_response)
+        if 'repoze.who.identity' in environ:
+            aes = environ['aes_cipher']
+            val = environ['repoze.who.identity']['repoze.who.userid']
+            userpwd = read_bauth(aes, val)
+            httpauth = 'Basic ' + base64.encodestring(userpwd).strip()
+            environ['HTTP_AUTHORIZATION'] = httpauth
+            
+        if app.use_x_headers is True:
+            environ['HTTP_X_VHM_HOST'] = app.href
+            environ['HTTP_X_VHM_ROOT'] = app.target
+
+        return app(environ, wrap_start_response(start_response))
     return caller
 
 
@@ -56,16 +91,22 @@ class HubDetails(object):
 class RemoteHub(URLMap):
 
     def about(self, environ):
-        for (domain, app_url), app in self.applications:
-            if app_url not in ('/__about__', 'login'):
-                yield (environ['HTTP_HOST'] + app_url,
-                       getattr(app, 'title', app_url))
+        identity = environ.get('repoze.who.identity')
+        if identity is not None:
+            tokens = set(identity.get('tokens', []))
+            for (domain, app_url), app in self.applications:
+                if app_url in tokens:
+                    link_url = app.link_url
+                    if link_url is None:
+                        link_url = 'http://%s%s' % (
+                            environ['HTTP_HOST'], app_url)
+                    yield (link_url, app.title)
 
     def __init__(self, *args, **kwargs):
         URLMap.__init__(self, *args, **kwargs)
         self['/__about__'] = HubDetails(self)
-        self['/login'] = login_app
-        self['/dologin'] = login_center(self)
+        self['/login'] = login_center(self)
+        self['/logout'] = logout_app
 
 
 def make_proxy(*global_conf, **local_conf):
@@ -75,7 +116,6 @@ def make_proxy(*global_conf, **local_conf):
     unicode_keys = lister(local_conf.get('unicode_keys'))
     json_keys = lister(local_conf.get('json_keys'))
     pickle_keys = lister(local_conf.get('pickle_keys'))
-    login_method = local_conf.get('login_method')
     
     application = WSGIProxyApp(
         href,
@@ -85,7 +125,17 @@ def make_proxy(*global_conf, **local_conf):
         json_keys=json_keys,
         pickle_keys=pickle_keys,
     )
+    application.href = href
+    application.target = local_conf.get('target', '/')
+    application.use_x_headers = local_conf.get(
+        'use_x_headers', 'False').lower() == 'true'
+
     app = wrapper(application)
-    app.login_method = login_method
+
+    # login info & metadata
+    app.login_method = local_conf.get('login_method')
+    app.login_url = local_conf.get('login_url') or href
     app.title = local_conf.get('title') or 'No title'
+    app.link_url = local_conf.get('link_url', None)
+
     return app

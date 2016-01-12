@@ -30,6 +30,8 @@ setup(name='remote',
           'wsgiproxy',
           'zope.interface',
           'repoze.who',
+          'requests',
+          'dolmen.template[cromlech]',
       ],
       tests_require=tests_require,
       extras_require={
@@ -41,9 +43,12 @@ setup(name='remote',
           ],
           'fanstatic.libraries': [
               'remote_wsgi = remote.resources:library',
-              ],
-         'paste.app_factory': [
-             'proxy = remote:make_proxy',
-         ],
+          ],
+          'paste.app_factory': [
+              'proxy = remote:make_proxy',
+          ],
+          'paste.filter_app_factory': [
+              'cipher = remote.ticket:cipher',
+          ],
       },
       )

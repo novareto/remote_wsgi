@@ -1,7 +1,13 @@
-[app:test]
+[filter:cipher]
+use = egg:remote#cipher                                                     
+cipher_key = mKaqGWwAVNnthL6J
+
+
+[app:extranet]
 use = egg:remote#proxy
-title = Some title
-href = http://karl.novareto.de:8088
+title = Extranet 
+href = http://karl.novareto.de:8088/app
+login_url = http://karl.novareto.de:8088/app
 string_keys = REMOTE_USER
 login_method = xmlrpc
 
@@ -13,11 +19,13 @@ href = http://www.novareto.de
 string_keys = REMOTE_USER
 
 
-[app:extranet]
+[app:asd]
 use = egg:remote#proxy
-title = Extranet 
-href = http://localhost:8080/app
+title = ASD-APP 
+href = http://karl.novareto.de:7002/2015
+login_url = http://karl.novareto.de:7002/2015/checkAuth
 string_keys = REMOTE_USER
+login_method = json 
 
 
 [filter:assets]
@@ -42,11 +50,11 @@ use = egg:remote#remotehub
 filter-with = assets
 / = novareto
 /extranet = extranet
-/test = test
+/asd = asd 
 
 
 [pipeline:main]
-pipeline = assets who hub
+pipeline = assets cipher who hub
 
 
 [server:main]

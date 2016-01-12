@@ -11,17 +11,16 @@ from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA
 from Crypto.Signature import PKCS1_v1_5
-from cromlech.browser import exceptions
-
-from zope.i18nmessageid import MessageFactory
+from repoze.who._compat import STRING_TYPES
+from repoze.who._compat import get_cookies
+from repoze.who.plugins.auth_tkt import AuthTktCookiePlugin as Basetkt
 
 
 SESSION_KEY = "remote"
-i18n = MessageFactory("remote")
 
 
-class MissingTicket(exceptions.HTTPForbidden):
-    title = _(u'Security ticket is missing : access forbidden')
+class MissingTicket(Exception):
+    title = u'Security ticket is missing : access forbidden'
 
 
 class TicketParseError(Exception):
@@ -32,18 +31,18 @@ class TicketParseError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return _('Ticket parse error: %s (%s)') % (self.msg, self.ticket)
+        return 'Ticket parse error: %s (%s)' % (self.msg, self.ticket)
 
 
 class BadTicket(TicketParseError):
 
-    def __init__(self, ticket, msg=_('Invalid ticket format')):
+    def __init__(self, ticket, msg='Invalid ticket format'):
         super(BadTicket, self).__init__(ticket, msg)
 
 
 class BadSignature(TicketParseError):
 
-    def __init__(self, ticket, msg=_('Invalid ticket format')):
+    def __init__(self, ticket, msg='Invalid ticket format'):
         super(BadSignature, self).__init__(ticket, msg)
 
 
@@ -216,28 +215,66 @@ def read_bauth(aes, val):
     return aes.decrypt(base64.b64decode(val))
 
 
-class signed_cookie(object):
+class AuthTktCookiePlugin(Basetkt):
 
-    def __init__(self, key):
-        self.pubkey = read_key(key)
+    def __init__(self, secret, cookie_name='auth_tkt',
+                 secure=False, include_ip=False, timeout=None,
+                 reissue_time=None, userid_checker=None, pkey=None):
+        Basetkt.__init__(self, secret, cookie_name, secure, include_ip,
+                         timeout, reissue_time, userid_checker)
+        self.pkey = pkey
+    
+    def remember(self, environ, identity):
+        cookies = get_cookies(environ)
+        if identity is not None and not self.cookie_name in cookies:
+            aes = environ['aes_cipher']
+            val = base64.b64encode(bauth(aes, '%s:%s' % (
+                identity['login'], identity['password'])))
+            identity['tokens'] = environ['remote.domains']
+            identity['repoze.who.userid'] = val 
+        return Basetkt.remember(self, environ, identity)
+        
 
-    def __call__(self, func):
-        def security_token_reader(request, *args):
-            myticket = request.cookies.get('auth_pubtkt')
-            if myticket is not None:
-                myticket = unquote(myticket)
-                fields = parse_ticket(myticket, self.pubkey)
+def _bool(value):
+    if isinstance(value, STRING_TYPES):
+        return value.lower() in ('yes', 'true', '1')
+    return value
 
-                # we get the basic auth elements
-                auth = read_bauth(
-                    request.environment['aes_cipher'], fields['bauth'])
-                user, password = auth.split(':', 1)
-
-                # we get the working portals
-                portals = fields['tokens']
-                request.environment['REMOTE_USER'] = user
-                request.environment['REMOTE_ACCESS'] = portals
-                return func(request, *args), None
-
-            return None, MissingTicket(location=None)
-        return security_token_reader
+    
+def make_plugin(secret=None,
+                secretfile=None,
+                cookie_name='auth_tkt',
+                secure=False,
+                include_ip=False,
+                timeout=None,
+                reissue_time=None,
+                userid_checker=None,
+                pkey=None,
+               ):
+    from repoze.who.utils import resolveDotted
+    if (secret is None and secretfile is None):
+        raise ValueError("One of 'secret' or 'secretfile' must not be None.")
+    if (secret is not None and secretfile is not None):
+        raise ValueError("Specify only one of 'secret' or 'secretfile'.")
+    if secretfile:
+        secretfile = os.path.abspath(os.path.expanduser(secretfile))
+        if not os.path.exists(secretfile):
+            raise ValueError("No such 'secretfile': %s" % secretfile)
+        with open(secretfile) as f:
+            secret = f.read().strip()
+    if timeout:
+        timeout = int(timeout)
+    if reissue_time:
+        reissue_time = int(reissue_time)
+    if userid_checker is not None:
+        userid_checker = resolveDotted(userid_checker)
+    plugin = AuthTktCookiePlugin(secret,
+                                 cookie_name,
+                                 _bool(secure),
+                                 _bool(include_ip),
+                                 timeout,
+                                 reissue_time,
+                                 userid_checker,
+                                 pkey=pkey,
+                                 )
+    return plugin

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import xmlrpclib
+import json, requests
 import socket
 from zope.interface import Interface, Attribute, implementer
 
@@ -44,6 +45,8 @@ def timeout(default_value):
                 return func(*args, **kwargs)
             except socket.timeout:
                 return default_value
+            except socket.error:
+                return default_value
         return just_call_it
     return might_timeout
 
@@ -53,12 +56,8 @@ class XMLRPCPortal(object):
 
     available = True
 
-    def __init__(self, url, title, backurl):
-        self.title = title
+    def __init__(self, url):
         self.url = url
-        self.backurl = backurl
-
-        # timed connection
         t = TimeoutTransport(timeout=3)
         self.server = xmlrpclib.Server(url, transport=t)
 
@@ -66,10 +65,25 @@ class XMLRPCPortal(object):
     def check_authentication(self, user, password):
         return self.server.checkAuth(user, password) is 1
 
-    @timeout(None)
-    def get_roles(self, user):
-        return self.server.getRolesFor(user)
 
-    @timeout(None)
-    def get_dashboard(self, user):
-        return self.server.getRemoteDashboard(user) % {'url': self.backurl}
+@implementer(IPortal)
+class JSONPortal(object):
+
+    available = True
+
+    def __init__(self, url):
+        self.url = url
+
+    @timeout(False)
+    def check_authentication(self, user, password):
+        params = dict(
+            username=user,
+            password=password,
+        )
+        try:
+            resp = requests.get(url=self.url, params=params)
+            if resp.status_code == 200:
+                auth = json.loads(resp.text)
+                return auth['auth'] is 1
+        except requests.ConnectionError as e:
+            return False
